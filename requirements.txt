@@ -1,0 +1,4 @@
+minimalmodbus
+pyserial
+python-can
+gpiod

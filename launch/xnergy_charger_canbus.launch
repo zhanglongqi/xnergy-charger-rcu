@@ -1,0 +1,12 @@
+<launch>
+    
+    <arg name="device" default="can0"                   doc="Communication port of charger for canbus interface use can0"/>
+    <arg name="comm_interface" default="canbus"                  doc="Communication interface of charger, use modbus/canbus/gpio "/>
+
+    <!-- Xnergy Charger Node -->
+    <node pkg="xnergy_charger_rcu" type="xnergy_charger_node.py" name="xnergy_charger_rcu" output="screen">
+        <param name="communication_interface" value="$(arg comm_interface)" />
+        <param name="device" value="$(arg device)" />
+    </node>
+
+</launch>

@@ -1,0 +1,20 @@
+<launch>
+    
+    
+    <arg name="comm_interface" default="gpio"    doc="Communication interface of charger, use `modbus`, `canbus`, or `gpio` "/>
+    <arg name="charger_control_chip" default="/dev/gpiochip0" doc="GPIO chip associated with charger control GPIO line."/>
+    <arg name="charger_control_line" default="1"       doc="GPIO line id to control charging."/>
+    <arg name="charger_status_chip" default="/dev/gpiochip0" doc="GPIO chip associated with charger status GPIO line."/>
+    <arg name="charger_status_line" default="2"       doc="GPIO line id to retrieve status."/>
+    
+
+    <!-- Xnergy Charger Node -->
+    <node pkg="xnergy_charger_rcu" type="xnergy_charger_node.py" name="xnergy_charger_rcu" output="screen">
+        <param name="communication_interface" value="$(arg comm_interface)" />
+        <param name="charger_control_chip" value="$(arg charger_control_chip)" />
+        <param name="charger_control_line" value="$(arg charger_control_line)"/>
+        <param name="charger_status_chip" value="$(arg charger_status_chip)" />
+        <param name="charger_status_line" value="$(arg charger_status_line)"/>
+    </node>
+
+</launch>

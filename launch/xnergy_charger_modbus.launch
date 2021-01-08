@@ -1,0 +1,14 @@
+<launch>
+    
+    <arg name="device" default="/dev/ttyUSB0"                   doc="Communication port of charger, for modbus interface use /dev/ttyUSB0, for canbus interface use can0"/>
+    <arg name="modbus_baudrate" default="9600"/>
+    <arg name="comm_interface" default="modbus"                  doc="Communication interface of charger, use modbus/canbus/gpio "/>
+
+    <!-- Xnergy Charger Node -->
+    <node pkg="xnergy_charger_rcu" type="xnergy_charger_node.py" name="xnergy_charger_rcu" output="screen">
+        <param name="communication_interface" value="$(arg comm_interface)" />
+        <param name="device" value="$(arg device)" />
+        <param name="modbus_baudrate" value="$(arg modbus_baudrate)" />
+    </node>
+
+</launch>

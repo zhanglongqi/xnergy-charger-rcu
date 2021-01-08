@@ -1,0 +1,9 @@
+## Goal Definition
+bool enable_charge
+---
+## Result Definition
+bool success
+string message
+---
+## Feedback Definition
+ChargerState status

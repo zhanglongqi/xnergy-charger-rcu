@@ -36,7 +36,7 @@ The following software needs the below mentioned setup:
 
     ```
     mkdir -p catkin_ws/src/xnergy_charger
-    git clone https://bitbucket.org/cognicept/xnergy-ros-driver.git catkin_ws/src/xnergy_charger
+    git clone https://bitbucket.org/zhanglongqi/xnergy-charger-rcu.git catkin_ws/src/xnergy_charger
     ```
 
 2. Install Python dependencies and build:

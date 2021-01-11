@@ -173,6 +173,23 @@ sudo ip link set can0 type can bitrate 250000
 sudo ip link set up can0
 ``` 
 
+**Docker**
+
+Repository contains `Dockerfile` to build docker image with setup environment for 
+
+Build docker image:
+
+```
+cd <path_to_xnergy_charger_rcu_package>
+docker build -t xnergy_charger_rcu:latest .
+```
+
+Run docker image for Modbus:
+
+```
+docker run -it --rm --name xnergy_charger -e ROS_MASTER_URI="http://localhost:11311" -e ROS_IP="127.0.0.1" -v /dev:/dev ros:xnergy roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch device:=/dev/ttyRCU
+```
+
 
 ## Contributors
 * Jakub Tomášek

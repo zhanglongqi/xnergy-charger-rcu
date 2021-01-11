@@ -236,14 +236,14 @@ class RCUModbusAdapter:
             self.rcu_lock.release()
             return
         except (minimalmodbus.NoResponseError, minimalmodbus.InvalidResponseError) as e:
-            rospy.logwarn("Invalid Modbus response.", str(e))
+            rospy.logdebug("Invalid Modbus response.")
             self.charge_status = ChargerState.RCU_NOT_CONNECTED
             self.charge_status_message = translate_charge_status(
                 self.charge_status)
             self.rcu_lock.release()
             return
         except:
-            rospy.logwarn("Could not read holding register. ")
+            rospy.logwarn("Could not read holding register.")
             self.charge_status = ChargerState.RCU_NOT_CONNECTED
             self.charge_status_message = translate_charge_status(
                 self.charge_status)

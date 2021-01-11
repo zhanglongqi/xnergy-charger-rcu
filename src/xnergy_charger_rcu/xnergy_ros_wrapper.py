@@ -203,5 +203,9 @@ class XnergyChargerROSWrapper:
         return stat
 
     def trigger_charging(self, request):
+        """
+        `trigger_charging` service callback.
+        """
+        rospy.loginfo("Enabling charging.")
         result = self.send_rcu_command(True)
         return TriggerResponse(success=result)

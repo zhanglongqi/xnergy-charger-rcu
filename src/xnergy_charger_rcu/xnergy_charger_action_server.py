@@ -32,9 +32,9 @@ class ChargeActionServer:
         self._driver.rcu.reset_errors()
         # publish info
         if(goal.enable_charge):
-            rospy.loginfo("ChargeActionServer: Enabling charging")
+            rospy.loginfo("Enabling charging")
         else:
-            rospy.loginfo("ChargeActionServer: Disabling charging")
+            rospy.loginfo("Disabling charging")
 
         feedback_msg = ChargeFeedback()
 

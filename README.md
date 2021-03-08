@@ -47,9 +47,9 @@ This package is tested under these environment setup:
 
 1. Create catkin workspace and clone repository as a package:
 
-    ```shell
-    mkdir -p catkin_ws/src/xnergy_charger_rcu
-    git clone https://gitlab.com/zhanglongqi/xnergy-charger-rcu.git catkin_ws/src/xnergy_charger_rcu
+    ```
+    mkdir -p catkin_ws/src/xnergy_charger
+    git clone https://github.com/westonrobot/xnergy-charger-rcu.git catkin_ws/src/xnergy_charger
     ```
 
 2. Install Python dependencies and build:

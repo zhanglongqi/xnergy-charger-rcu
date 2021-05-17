@@ -23,7 +23,7 @@ This package is a ROS driver for Xnergy wireless charger. The ROS driver facilit
 The following software needs the below mentioned setup:
 
 * Ubuntu 18.04 Bionic Beaver + [ROS Melodic](http://wiki.ros.org/melodic/Installation/Ubuntu)
-* Python version 3.7
+* Python version **3.7+**
 * Python Library Dependencies:
     * minimalmodbus == 1.0.2
     * pyserial == 3.4

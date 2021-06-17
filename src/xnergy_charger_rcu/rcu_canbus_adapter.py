@@ -43,9 +43,6 @@ class RCUCANbusAdapter:
         self.coil_temperature = -1
         self.rcu_lock = Lock()
         self._port = port
-        # TODO configure voltage conversion and current conversion based on model configuration
-        self.voltage_conversion = 0.01155
-        self.current_conversion = 0.04028
 
     def connect(self):
         try:

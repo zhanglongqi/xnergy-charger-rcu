@@ -133,8 +133,6 @@ class RCUModbusAdapter:
         self.runtime_current_setting = -1
         self.charge_status = -1
         self.charge_status_message = 'None'
-        self.voltage_conversion = -1
-        self.current_conversion = -1
         self.rcu_lock = Lock()
         self._baudrate = baudrate
         self._slave_addr = slave_addr
@@ -164,25 +162,12 @@ class RCUModbusAdapter:
             # runtime voltage setting information
             runtime_voltage_setting_reg = self._instrument.read_registers(registeraddress=_MODBUS_ADDRESS_RUNTIME_VOLTAGE_SETTING, number_of_registers=1,
                                                                           functioncode=_MODBUS_READ_HOLDING_REGISTERS)
-            self.runtime_voltage_setting = float(
-                runtime_voltage_setting_reg[0])/128
+            self.runtime_voltage_setting = float(runtime_voltage_setting_reg[0]>>7)
 
             # runtime currnet setting information
             runtime_current_setting_reg = self._instrument.read_registers(registeraddress=_MODBUS_ADDRESS_RUNTIME_CURRENT_SETTING, number_of_registers=1,
                                                                           functioncode=_MODBUS_READ_HOLDING_REGISTERS)
-            self.runtime_current_setting = float(
-                runtime_current_setting_reg[0])/128
-
-            # Set voltage conversion
-            if self.runtime_voltage_setting > 48.0:
-                self.voltage_conversion = 0.02229
-            else:
-                self.voltage_conversion = 0.01155
-
-            if self.runtime_voltage_setting > 48.0:
-                self.current_conversion = 0.02014
-            else:
-                self.current_conversion = 0.04028
+            self.runtime_current_setting = float(runtime_current_setting_reg[0]>>7)
             return True
         except:
             self.is_connected = False
@@ -298,10 +283,10 @@ class RCUModbusAdapter:
 
         # output current information
         output_current = data[_MODBUS_ADDRESS_OUTPUT_CURRENT]
-        self.output_current = float(output_current) * self.current_conversion
+        self.output_current = float(output_current>>7)
         # battery voltage information
         battery_voltage = data[_MODBUS_ADDRESS_BATTERY_VOLTAGE]
-        self.battery_voltage = float(battery_voltage) * self.voltage_conversion
+        self.battery_voltage = float(battery_voltage>>7)
 
         # RCU Hardware Status variable
         # device temperature information

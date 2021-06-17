@@ -112,8 +112,7 @@ class RCUCANbusAdapter:
             battery_msg = self._receive_can_message()
             battery_msg = battery_msg[10:12]+battery_msg[8:10]
 
-            # TODO add as constants and change depending on type of charger
-            self.battery_voltage = int(battery_msg, 16)*self.voltage_conversion
+            self.battery_voltage = int(battery_msg, 16)
 
             # Get Charging Current
             self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False,
@@ -122,7 +121,7 @@ class RCUCANbusAdapter:
             charge_current_msg = charge_current_msg[10:12] + \
                 charge_current_msg[8:10]
             self.output_current = int(
-                charge_current_msg[:4], 16)*self.current_conversion
+                charge_current_msg[:4], 16)
         except can.CanError as e:
             self.charge_status_message = "comm error"
             self.charge_status = ChargerState.RCU_NOT_CONNECTED

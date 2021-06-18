@@ -9,10 +9,6 @@ from sensor_msgs.msg import BatteryState
 from xnergy_charger_rcu.msg import ChargerState
 from std_srvs.srv import Trigger, TriggerResponse
 
-from xnergy_charger_rcu.rcu_modbus_adapter import RCUModbusAdapter
-from xnergy_charger_rcu.rcu_canbus_adapter import RCUCANbusAdapter
-from xnergy_charger_rcu.rcu_gpio_adapter import RCUGPIOAdapter
-
 
 class XnergyChargerROSWrapper:
     def __init__(self):
@@ -38,26 +34,31 @@ class XnergyChargerROSWrapper:
                               self.check_device_temperature)
         self.diag_updater.add("Coil Temperature", self.check_coil_temperature)
         self.diag_updater.setHardwareID(rospy.get_name())
-        self.trigger_charging_srv = rospy.Service(
-            '~trigger_charging', Trigger, self.trigger_charging)
+        self.start_charging_srv = rospy.Service(
+            '~start_charging', Trigger, self.start_charging)
+
+        self.stop_charging_srv = rospy.Service(
+            '~stop_charging', Trigger, self.stop_charging)
 
     def init_connection(self, interface):
         """
         Init comunication with the interface and check whether it is connected
         """
         if interface == "modbus":
+            from xnergy_charger_rcu.rcu_modbus_adapter import RCUModbusAdapter
             baudrate = rospy.get_param("~baudrate", 9600)
             port = rospy.get_param("~device", "/dev/ttyUSB0")
             print("Device: " + port)
             self.rcu = RCUModbusAdapter(port=port, baudrate=baudrate)
 
         elif interface == "canbus":
+            from xnergy_charger_rcu.rcu_canbus_adapter import RCUCANbusAdapter
             port = rospy.get_param("~device", "can0")
             rospy.loginfo("Interface: " + port)
             self.rcu = RCUCANbusAdapter(port=port)
 
         elif interface == "gpio":
-
+            from xnergy_charger_rcu.rcu_gpio_adapter import RCUGPIOAdapter
             charger_control = {}
             charger_control['chip'] = rospy.get_param(
                 "~charger_control_chip", "/dev/gpiochip0")
@@ -100,17 +101,17 @@ class XnergyChargerROSWrapper:
         self.rcu.get_rcu_status()
 
         if (self.rcu.firmware_version_number > 0):
-            firmware_version_number = str(self.rcu.firmware_version_number)
+            firmware_version_number = f'{self.rcu.firmware_version_number:04X}'
         else:
             firmware_version_number = "Unknown"
 
-        if (self.rcu.runtime_voltage_setting > 0):
+        if (self.rcu.runtime_voltage_setting >= 0):
             runtime_voltage_setting = str(
                 self.rcu.runtime_voltage_setting) + " V"
         else:
             runtime_voltage_setting = "Unknown"
 
-        if (self.rcu.runtime_current_setting > 0):
+        if (self.rcu.runtime_current_setting >= 0):
             runtime_current_setting = str(
                 self.rcu.runtime_current_setting) + " A"
         else:
@@ -147,7 +148,7 @@ class XnergyChargerROSWrapper:
         msg.header.stamp = rospy.Time.now()
         msg.voltage = self.rcu.battery_voltage
         msg.current = self.rcu.output_current
-        battery_full = self.rcu.runtime_voltage_setting
+        battery_full = self.rcu.runtime_voltage_setting if self.rcu.runtime_voltage_setting > 0 else 1
         msg.percentage = 1 - \
             (battery_full - self.rcu.battery_voltage) / battery_full
         if self.rcu.charge_status_message == 'charging':

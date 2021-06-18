@@ -143,8 +143,6 @@ class RCUModbusAdapter:
 
     def connect(self):
         try:
-            if(self.is_connected):
-                self._instrument.close()
             self._instrument = Instrument(
                 port=self._port, mode=MODE_RTU, slaveaddress=self._slave_addr)
             self._instrument.serial.baudrate = self._baudrate
@@ -169,7 +167,8 @@ class RCUModbusAdapter:
                                                                           functioncode=_MODBUS_READ_HOLDING_REGISTERS)
             self.runtime_current_setting = float(runtime_current_setting_reg[0]>>7)
             return True
-        except:
+        except (serial.SerialException, minimalmodbus.ModbusException, AttributeError) as e:
+            rospy.logerr(e)
             self.is_connected = False
             return False
         # self._instrument.serial.timeout = 0.4

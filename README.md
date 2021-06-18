@@ -192,7 +192,7 @@ docker build -t xnergy_charger_rcu:latest .
 Run docker image for Modbus:
 
 ```
-docker run -it --rm --name xnergy_charger -e ROS_MASTER_URI="http://localhost:11311" -e ROS_IP="127.0.0.1" -v /dev:/dev xnergy_charger_rcu:latest roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch device:=/dev/ttyRCU
+docker run -it --rm -e ROS_MASTER_URI="http://localhost:11311" -e ROS_IP="127.0.0.1" --device=/dev/ttyRCU xnergy_charger_rcu:latest roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch device:=/dev/ttyRCU
 ```
 
 

@@ -203,10 +203,18 @@ class XnergyChargerROSWrapper:
                          level=2, message="Overheat: "+str(coil_temperature)+" in Celsius")
         return stat
 
-    def trigger_charging(self, request):
+    def start_charging(self, request):
         """
-        `trigger_charging` service callback.
+        `start_charging` service callback.
         """
         rospy.loginfo("Enabling charging.")
         result = self.send_rcu_command(True)
+        return TriggerResponse(success=result)
+
+    def stop_charging(self, request):
+        """
+        `stop_charging` service callback.
+        """
+        rospy.loginfo("stop charging.")
+        result = self.send_rcu_command(False)
         return TriggerResponse(success=result)

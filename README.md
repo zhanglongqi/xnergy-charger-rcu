@@ -107,10 +107,14 @@ The Xnergy Charger RCU Node publishes data to following topics:
 
 ### Services
 
-`xnergy_charger_rcu` ROS node offers `~trigger_charging` service of type `std_srvs/Trigger`. Calling this service will enable charging. This is a nonblocking call, that is charging request is sent to RCU but doesn't wait to finish enable charging procedure. This is the easiest way to enable charging:
+`xnergy_charger_rcu` ROS node offers `~trigger_charging` service of type `std_srvs/Trigger`. Calling this service will enable charging. This is a nonblocking call, that is charging request is sent to RCU but doesn't wait to finish enable charging procedure. This is the easiest way to start/stop charging:
 
 ```
-rosservice call /xnergy_charger_rcu/trigger_charging "{}" 
+rosservice call /xnergy_charger_rcu/start_charging
+```
+
+```shell
+rosservice call /xnergy_charger_rcu/stop_charging
 ```
 
 ### ChargerActionServer

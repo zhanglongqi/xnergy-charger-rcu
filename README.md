@@ -178,6 +178,20 @@ sudo ip link set can0 type can bitrate 250000
 sudo ip link set up can0
 ```
 
+### GPIO
+
+Install `gpiod`
+
+```shell
+sudo apt install gpiod
+```
+
+Show which gpio you can use
+
+```shell
+sudo gpioinfo
+```
+
 ## Docker
 
 Repository contains `Dockerfile` to build docker image with setup environment for

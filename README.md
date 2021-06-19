@@ -80,19 +80,22 @@ roslaunch xnergy_charger_rcu xnergy_charger_gpio.launch
 ### Config parameters
 
 * **Modbus**:
-  * `device` : default value = '/dev/ttyUSB0' (depend on the USB port used)
-  * `modbus_baudrate` : default value = 9600
+  * `device` : default value = '/dev/ttyUSB0' (depend on the serial port used)
+  * `modbus_baudrate` : value = 9600 (Do **NOT** change for Xnergy charger)
   * `communication_interface` : value = 'modbus'
 
 * **CANbus**:
-  * `device` : default value = 'can0' (depend on the port used)
+  * `device` : default value = 'can0' (depend on the CAN port used)
   * `communication_interface` : value = 'canbus'
 
 * **GPIO**:
-  * `device` : default value = '/dev/gpiochip0' (depend on the port used)
+  * `charger_control_chip` : default value = '/dev/gpiochip0' (depend on the gpio used for charger control)
+  * `charger_control_line` : default value = 1 (gpio line to start/stop charging, depend on the gpio connection to gpio control pin)
+
+  * `charger_status_chip`: default value = '/dev/gpiochip0' (depend on the gpio used for charger status)
+  * `charger_status_line` : default value = 2 (gpio line to read charger status, depend on the gpio connection to gpio status pin)
+
   * `communication_interface` : value = 'gpio'
-  * `charger_en_pin` : default value =1 (charger_enable gpio lines, depend on the gpio connection to the hardware)
-  * `charger_st_pin` : gpio line to read charger status (defaults to "2")
 
 ### Published Topics
 

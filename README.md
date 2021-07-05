@@ -36,14 +36,14 @@ This package is tested under these environment setup:
 1. Create catkin workspace and clone repository as a package:
 
     ```shell
-    mkdir -p catkin_ws/src/xnergy_charger
-    git clone https://bitbucket.org/cognicept/xnergy-ros-driver.git catkin_ws/src/xnergy_charger
+    mkdir -p catkin_ws/src/xnergy_charger_rcu
+    git clone https://gitlab.com/zhanglongqi/xnergy-charger-rcu.git catkin_ws/src/xnergy_charger_rcu
     ```
 
 2. Install Python dependencies and build:
 
     ```shell
-    pip3 install -r catkin_ws/src/xnergy_charger/requirements.txt
+    pip3 install -r catkin_ws/src/xnergy_charger_rcu/requirements.txt
     cd catkin_ws
     catkin_make
     source devel/setup.bash

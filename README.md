@@ -60,7 +60,7 @@ roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch
 or with argument
 
 ```shell
-roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch device="/dev/ttyUSB1"
+roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch device:="/dev/ttyRCU"
 ```
 
 **CANbus**:

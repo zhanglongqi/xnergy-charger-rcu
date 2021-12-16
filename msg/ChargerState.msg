@@ -17,4 +17,8 @@ int16 RCU_ERROR = 238
 
 Header header
 int16 state
+float32 runtime_voltage_setting
+float32 runtime_current_setting
+uint32 error_code
+uint32 shadow_error_code
 string message

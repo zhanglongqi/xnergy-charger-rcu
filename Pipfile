@@ -1,0 +1,16 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+python-can = "*"
+minimalmodbus = "*"
+gpiod = "*"
+
+[dev-packages]
+yapf = "*"
+flake8 = "*"
+
+[requires]
+python_version = "3.8"

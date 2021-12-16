@@ -42,14 +42,15 @@ class XnergyChargerROSWrapper:
 			from xnergy_charger_rcu.rcu_modbus_adapter import RCUModbusAdapter
 			baudrate = rospy.get_param("~baudrate", 9600)
 			port = rospy.get_param("~device", "/dev/ttyUSB0")
-			print("Device: " + port)
+			rospy.loginfo(f'serial port device: {port}, baudrate: {baudrate}')
 			self.rcu = RCUModbusAdapter(port=port, baudrate=baudrate)
 
 		elif interface == "canbus":
 			from xnergy_charger_rcu.rcu_canbus_adapter import RCUCANbusAdapter
 			port = rospy.get_param("~device", "can0")
-			rospy.loginfo("Interface: " + port)
-			self.rcu = RCUCANbusAdapter(port=port)
+			bitrate = rospy.get_param("~bitrate", 250000)
+			rospy.loginfo(f'CAN bus device: {port} {bitrate=}')
+			self.rcu = RCUCANbusAdapter(port=port, bitrate=bitrate)
 
 		elif interface == "gpio":
 			from xnergy_charger_rcu.rcu_gpio_adapter import RCUGPIOAdapter
@@ -123,6 +124,10 @@ class XnergyChargerROSWrapper:
 		msg = ChargerState()
 		msg.header.stamp = rospy.Time.now()
 		msg.state = self.rcu.charge_status
+		msg.runtime_voltage_setting = self.rcu.runtime_voltage_setting
+		msg.runtime_current_setting = self.rcu.runtime_current_setting
+		msg.error_code = self.rcu.error_code
+		msg.shadow_error_code = self.rcu.shadow_error_code
 		msg.message = str(self.rcu.charge_status_message)
 		self.rcu_status = msg
 		self.rcu_status_pub.publish(msg)
@@ -133,8 +138,7 @@ class XnergyChargerROSWrapper:
 		msg.voltage = self.rcu.battery_voltage
 		msg.current = self.rcu.output_current
 		battery_full = self.rcu.runtime_voltage_setting if self.rcu.runtime_voltage_setting > 0 else 1
-		msg.percentage = 1 - \
-            (battery_full - self.rcu.battery_voltage) / battery_full
+		msg.percentage = 1 - (battery_full - self.rcu.battery_voltage) / battery_full
 		if self.rcu.charge_status_message == 'charging':
 			msg.power_supply_status = 1
 		elif self.rcu.charge_status_message == 'stop':
@@ -154,7 +158,7 @@ class XnergyChargerROSWrapper:
 		"""
         Function that allow ChargerActionServer to send command directly to RCU unit
         """
-		if goal_command == True:
+		if goal_command:
 			return self.rcu.enable_charge()
 		else:
 			return self.rcu.disable_charge()

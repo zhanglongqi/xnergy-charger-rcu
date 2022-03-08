@@ -1,35 +1,47 @@
+
+
+- [Xnergy RCU ROS driver](#xnergy-rcu-ros-driver)
+  - [System Requirements](#system-requirements)
+  - [Getting Started](#getting-started)
+  - [ROS interfaces](#ros-interfaces)
+    - [Config parameters](#config-parameters)
+    - [Published Topics](#published-topics)
+    - [Services](#services)
+    - [Action Server](#action-server)
+    - [Charger Action Server](#charger-action-server)
+    - [Range Check Action Server](#range-check-action-server)
+  - [Connecting RCU](#connecting-rcu)
+  - [Others](#others)
+    - [Modbus](#modbus)
+    - [CANbus](#canbus)
+    - [GPIO](#gpio)
+  - [Docker](#docker)
+  - [Maintainer](#maintainer)
+  - [Contributors](#contributors)
+----
+
+
+
 # Xnergy RCU ROS driver
 
 This package is a ROS driver for Xnergy wireless charger. The ROS driver facilitates communication with the Receiver Unit (RCU) mounted on the robot via Modbus, CANbus, or GPIO.
 
-----
-
-## Table of Contents
-
-1. [System requirements](#system-requirements)
-2. [Getting started](#Getting-started)
-3. [ROS interfaces](#ros-interfaces)
-    * [Config parameters](#config-parameters)
-    * [Published topics](#published-topics)
-    * [Services](#services)
-    * [Action server](#chargeractionserver)
-4. [Connecting RCU](#connecting-RCU)
-5. [Others](#others)
-6. [Contributors](#contributors)
-
-----
 
 ## System Requirements
 
 This package is tested under these environment setup:
 
-* Ubuntu 18.04 Bionic Beaver + [ROS Melodic](http://wiki.ros.org/melodic/Installation/Ubuntu)
-* Python version 3.7.*
-* Python Library Dependencies:
-  * minimalmodbus == 1.0.2
-  * pyserial == 3.4
-  * python-can == 3.3.4
-  * python3-gpiod
+* [Ubuntu 20.04 Focal Fossa](https://wiki.ubuntu.com/FocalFossa/ReleaseNotes) 
+* [ROS Noetic](http://wiki.ros.org/noetic/Installation/Ubuntu)
+* Python version == 3.8.10
+* Python Library:
+  * aenum==3.1.5
+  * gpiod==1.5.0
+  * minimalmodbus==2.0.1
+  * pyserial==3.5
+  * python-can==3.3.4
+  * wrapt==1.13.3
+
 
 ## Getting Started
 
@@ -69,6 +81,12 @@ roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch device:="/dev/ttyRCU"
 roslaunch xnergy_charger_rcu xnergy_charger_canbus.launch
 ```
 
+or with argument
+
+```shell
+roslaunch xnergy_charger_rcu xnergy_charger_canbus.launch device:="canNUM" bitrate:="250000"
+```
+
 **GPIO**:
 
 ```shell
@@ -81,11 +99,11 @@ roslaunch xnergy_charger_rcu xnergy_charger_gpio.launch
 
 * **Modbus**:
   * `device` : default value = '/dev/ttyUSB0' (depend on the serial port used)
-  * `modbus_baudrate` : value = 9600 (Do **NOT** change for Xnergy charger)
   * `communication_interface` : value = 'modbus'
 
 * **CANbus**:
   * `device` : default value = 'can0' (depend on the CAN port used)
+  * `bitrate` : default value = 250000 (depend on the CANBUS setting in the RCU)
   * `communication_interface` : value = 'canbus'
 
 * **GPIO**:
@@ -103,7 +121,7 @@ The Xnergy Charger RCU Node publishes data to following topics:
 
 * `~rcu_status`(type `ChargerState`): topic to monitor RCU state (idle, wait RF, Handshake, Paired, Pre-run, charging, stop, restart delay, debug mode, error).
 
-* `~battery_state`(type [`sensor_msgs/BatteryState.msg`](http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/BatteryState.html)) : topic to monitor RCU output current, battery voltage, charger voltage
+<!-- * `~battery_state`(type [`sensor_msgs/BatteryState.msg`](http://docs.ros.org/en/melodic/api/sensor_msgs/html/msg/BatteryState.html)) : topic to monitor RCU output current, battery voltage, charger voltage -->
 
 * `/diagnostics` : ROS diagnostics message for Xnergy Charger RCU Node for hardware information: **device temperature** and **coil temperature**.
 
@@ -119,16 +137,75 @@ rosservice call /xnergy_charger_rcu/start_charging
 rosservice call /xnergy_charger_rcu/stop_charging
 ```
 
-### ChargerActionServer
+### Action Server
+In any large ROS based system, there are cases when someone would like to send a request to a node to perform some task, and also receive a reply to the request. This can currently be achieved via ROS services.
 
-ChargerActionServer is `actionlib` server controlling charging at `/xnergy_charger_rcu/charge/` of custom type `Charge.action`. For details on actionlib please refer to [documentation](http://wiki.ros.org/actionlib). This is the best way to integrate  
+In some cases, however, if the service takes a long time to execute, the user might want the ability to cancel the request during execution or get periodic feedback about how the request is progressing. The actionlib package provides tools to create servers that execute long-running goals that can be preempted. It also provides a client interface in order to send requests to the server.
 
-This action server will handle control by listening for incoming goals on the action name .
+For details on actionlib please refer to [documentation](http://wiki.ros.org/actionlib). This is the best way to integrate.
 
-To send a goal to `ChargerActionServer`, you coulcould use axclient from `actionlib`. Run:
+Xnergy Charger RCU Node provides the following action servers:
+Charge Action Server and Range Check Action Server.
+
+
+The easiest way to test action server is to use the command line tool from actionlib.
+Install `actionlib-tools` if you did not install it before:
 
 ```shell
-rosrun actionlib axclient.py /xnergy_charger_rcu/charge
+sudo apt install ros-noetic-actionlib-tools
+```
+
+### Charger Action Server
+
+Charger Action Server is an `actionlib` server controlling charging at `/xnergy_charger_rcu/charge` of custom type `Charge.action`. 
+
+To test a goal to Charger Action Server, you could use `axclient` from `actionlib`. Run:
+```shell
+rosrun actionlib_tools axclient.py /xnergy_charger_rcu/charge
+```
+
+### Range Check Action Server
+
+`Range Check` is available only for communication interface with Xnergy RCU using `canbus` and `modbus`.
+
+Range Check Action Server is an `actionlib` server used for controlling Xnergy RCU at `/xnergy_charger_rcu/rangecheck` of custom type `RangeCheck.action`. 
+
+To send a goal to Range Check Action Server, you could use `axclient` from `actionlib`. Run:
+
+```shell
+rosrun actionlib_tools axclient.py /xnergy_charger_rcu/rangecheck
+```
+
+Users or Systems need to wait 5 seconds before sending a new goal to `Range Check` Action Server only when the previous goal has accomplished 
+because the Xnergy RCU requires some time to be ready. 
+
+`Range Check` feature is available only for Xnergy RCU with firmware V1.25 onwards.
+
+```shell
+|                                      |
+|                                      |
+|                 goal 1               |
+|     +-------------------------->     |
+|                                      |
+|               feedback 1             |
+|     <--------------------------+     |
+|               feedback 2             |
+|     <--------------------------+     |
+|               feedback N             |
+|     <--------------------------+     |
+|               result 1               |
+|     <--------------------------+     |
+|                                      |
+|                                      |
+|         wait for 5 seconds before    |
+|           sending a new goal         |
+|                                      |
+|               goal 2                 |
+|     +--------------------------->    |
+|                                      |
+|                                      |
+|                                      |
+v                                      v
 ```
 
 ## Connecting RCU
@@ -174,6 +251,8 @@ ip link show
 Configuring and Enabling the SocketCAN Interface: To enable CAN interface with RCU unit, run:
 
 ```shell
+sudo ip link set down can0
+# sudo ip link set can0 txqueuelen 1000
 sudo ip link set can0 type can bitrate 250000
 sudo ip link set up can0
 ```
@@ -208,6 +287,10 @@ Run docker image for Modbus:
 ```shell
 docker run -it --rm -e ROS_MASTER_URI="http://localhost:11311" -e ROS_IP="127.0.0.1" --device=/dev/ttyRCU xnergy_charger_rcu:latest roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch device:=/dev/ttyRCU
 ```
+
+## Maintainer
+
+* Zhang LongQi
 
 ## Contributors
 

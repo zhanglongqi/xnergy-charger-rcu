@@ -3,6 +3,7 @@
 import rospy
 import actionlib
 from xnergy_charger_rcu.msg import ChargerState, ChargeAction, ChargeFeedback, ChargeResult
+from xnergy_charger_rcu.utils import translate_charge_status
 
 
 class ChargeActionServer:
@@ -10,8 +11,8 @@ class ChargeActionServer:
 
 	def __init__(self, namespace, action_name, rcu_unit):
 		"""
-        Get control from XnergyROSWrapper and Wait for Action Client 
-        to send Action Goal to trigger goal_callback()  
+        Get control from XnergyROSWrapper and Wait for Action Client
+        to send Action Goal to trigger goal_callback()
         """
 		self._action_name = namespace + action_name
 		self._as = actionlib.SimpleActionServer(self._action_name, ChargeAction, execute_cb=self.goal_callback, auto_start=False)
@@ -28,7 +29,6 @@ class ChargeActionServer:
         after that keep monitoring RCU status and publish Action Feedback.
         It will return the Action Result to Action Client whenever the goal is success or fail.
         """
-		self._driver.rcu.reset_errors()
 		# publish info
 		if (goal.enable_charge):
 			rospy.loginfo("Enabling charging")
@@ -39,15 +39,18 @@ class ChargeActionServer:
 
 		# Send goal command to Xnergy RCU
 		# If there is communication error, Action Server will abort the goal
-		result = self._driver.send_rcu_command(goal.enable_charge)
+		result = self._driver.charging_switch(goal.enable_charge)
 
 		goal_failed = False
 		if not result:
 			goal_failed = True
 			fail_msg = "Failed: Failed send RCU command."
 
+		feedback_msg.status = self._driver.rcu_status
+		self._as.publish_feedback(feedback_msg)
+
 		# Wait until command is received by Xnergy RCU Unit
-		rospy.sleep(rospy.Duration(0.1))
+		rospy.sleep(rospy.Duration(1))
 		# Set Action Server as active
 		rate = rospy.Rate(2)
 		timer = 0
@@ -59,31 +62,50 @@ class ChargeActionServer:
 
 			current_errors = set(self._driver.rcu.errors)
 			errors = errors | current_errors
+			error_code = self._driver.rcu.error_code
+			shadow_error_code = self._driver.rcu.shadow_error_code
 
 			# when RCU unit status is in 'stop', 'error', 'debug_mode', the action will be aborted
-			if (rcu_state == ChargerState.RCU_STOP and goal.enable_charge) or \
-                (rcu_state == ChargerState.RCU_RESERVE_2) or \
-                (rcu_state == ChargerState.RCU_ERROR) or \
-                (rcu_state == ChargerState.RCU_RESERVE_1 and goal.enable_charge) or \
-                    (rcu_state == ChargerState.RCU_IDLE and goal.enable_charge and timer > 4 and not self._driver.comm_interface == "gpio"):
-				fail_msg = "RCU state is " + feedback_msg.status.message
-				rospy.loginfo(fail_msg)
-				goal_failed = True
-				break
-			# when RCU unit is successfully trigger charging or discharge, the action will be set as success
-			elif (goal.enable_charge == True and rcu_state == ChargerState.RCU_CHARGING and self._driver.comm_interface == "canbus" and timer > 20) or \
-                (goal.enable_charge == True and rcu_state == ChargerState.RCU_CHARGING) or \
-                    (goal.enable_charge == False and rcu_state == ChargerState.RCU_IDLE):
+			if self._driver.comm_interface in ["canbus", "modbus"]:
+				rcu_state_name = translate_charge_status(rcu_state)
+				if goal.enable_charge:
+					# check charging is enabled or not
+					if 'handshake' == rcu_state_name:
+						goal_failed = False
+						rospy.loginfo("RCU is in handshake")
+					elif 'charging' == rcu_state_name:
+						goal_failed = False
+						rospy.loginfo("RCU is in charging")
+						break
+					else:
+						rospy.logerr(f'RCU is in error state {rcu_state} error code {error_code:08X} shadow error code {shadow_error_code:08X}')
+						goal_failed = True
+						fail_msg = f'start charging failed, charger state: {rcu_state} error code {error_code:08X} shadow error code {shadow_error_code:08X}'
+						break
+				else:
+					# check charging is disabled or not
+					if rcu_state_name in ('idle', ):
+						goal_failed = False
+						break
+					elif rcu_state_name in ('stopping', ):
+						rospy.loginfo("stopping charging")
+
+					elif rcu_state_name in ['XNERGY_RESERVED', 'error']:
+						goal_failed = True
+						fail_msg = f'stop charging failed, charger state: {rcu_state} error code {error_code:08X} shadow error code {shadow_error_code:08X}'
+						break
+
+			elif self._driver.comm_interface == "gpio":
 				goal_failed = False
 				break
 			# check that preempt has not been requested by the client
-			elif self._as.is_preempt_requested():
+			if self._as.is_preempt_requested():
 				fail_msg = "Failed: Goal was cancelled."
-				rospy.loginfo(fail_msg)
+				rospy.logwarn(fail_msg)
 				break
-			elif timer >= 30:
-				fail_msg = "Failed: Action timeout, it took more than 15 seconds."
-				rospy.loginfo(fail_msg)
+			if timer >= 30:
+				fail_msg = "Failed: Action timeout, it took more than 30 seconds."
+				rospy.logwarn(fail_msg)
 				goal_failed = True
 				break
 			timer += 1
@@ -105,7 +127,6 @@ class ChargeActionServer:
 
 			self._as.set_succeeded(result_msg)
 		else:
-			fail_msg = fail_msg
 			if (len(errors) > 0):
 				fail_msg = fail_msg + ":" + ";".join(errors)
 			result_msg.success = False

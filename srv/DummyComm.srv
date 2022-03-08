@@ -1,0 +1,11 @@
+
+#request constants
+
+#request fields
+string name
+int32 value
+---
+#response constants
+#response fields
+bool success
+string message

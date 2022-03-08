@@ -1,0 +1,9 @@
+<launch>
+
+	<arg name="comm_interface" default="dummy" doc="Communication interface of charger, use dmummy interface to test" />
+
+	<!-- Xnergy Charger Node -->
+	<node pkg="xnergy_charger_rcu" type="xnergy_charger_node.py" name="xnergy_charger_rcu" output="screen">
+		<param name="communication_interface" value="$(arg comm_interface)" />
+	</node>
+</launch>

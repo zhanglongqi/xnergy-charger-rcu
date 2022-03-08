@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 
 import can
+from typing import Optional
+import struct
+import time
 import rospy
-from threading import Lock
+from threading import RLock
 from xnergy_charger_rcu.msg import ChargerState
+from xnergy_charger_rcu.utils import translate_charge_status, absolut_zero_temperature
 
 # CAN BUS Command
 _CANBUS_ADDRESS_ENABLE_CHARGING = [0x2F, 0x00, 0x20, 0x01, 0x01, 0x00, 0x00, 0x00]
@@ -18,21 +22,60 @@ _CANBUS_ADDRESS_READ_RUNTIME_ERROR_HI = [0x40, 0x02, 0x20, 0x04, 0x00, 0x00, 0x0
 
 _CANBUS_ADDRESS_READ_BATTERY_VOLTAGE = [0x40, 0x02, 0x20, 0x06, 0x00, 0x00, 0x00, 0x00]
 _CANBUS_ADDRESS_READ_CHARGING_CURRENT = [0x40, 0x02, 0x20, 0x07, 0x00, 0x00, 0x00, 0x00]
+_CANBUS_ADDRESS_READ_MAIN_STATE = [0x40, 0x02, 0x20, 0x0A, 0x00, 0x00, 0x00, 0x00]
+_CANBUS_ADDRESS_READ_FIRMWARE_REVISION_LO = [0x40, 0x02, 0x20, 0x0B, 0x00, 0x00, 0x00, 0x00]
+_CANBUS_ADDRESS_READ_FIRMWARE_REVISION_HI = [0x40, 0x02, 0x20, 0x0C, 0x00, 0x00, 0x00, 0x00]
 
 _CANBUS_ADDRESS_READ_RUNTIME_VOLTAGE_SETTING = [0x40, 0x01, 0x20, 0x01, 0x00, 0x00, 0x00, 0x00]
 _CANBUS_ADDRESS_READ_RUNTIME_CURRENT_SETTING = [0x40, 0x01, 0x20, 0x02, 0x00, 0x00, 0x00, 0x00]
 
+_CANBUS_ADDRESS_REQUEST_RANGE_CHECK = [0x2F, 0x00, 0x20, 0x02, 0x01, 0x00, 0x00, 0x00]
+_CANBUS_ADDRESS_READ_RANGE_CHECK_STATUS = [0x40, 0x02, 0x20, 0x0D, 0x00, 0x00, 0x00, 0x00]
+
+
+class CanDataError(Exception):
+	"""
+	if the received data is not valid, this exception will be raised
+
+    If specified, the error code is automatically appended to the message:
+
+    >>> # With an error code (it also works with a specific error):
+    >>> error = CanOperationError(message="Failed to do the thing", error_code=42)
+    >>> str(error)
+    'Failed to do the thing [Error Code 42]'
+    >>>
+    >>> # Missing the error code:
+    >>> plain_error = CanError(message="Something went wrong ...")
+    >>> str(plain_error)
+    'Something went wrong ...'
+
+    :param error_code:
+        An optional error code to narrow down the cause of the fault
+
+    :arg error_code:
+        An optional error code to narrow down the cause of the fault
+    """
+
+	def __init__(
+		self,
+		message: str = "",
+		error_code: Optional[int] = None,
+	) -> None:
+		self.error_code = error_code
+		super().__init__(message if error_code is None else f"{message} [Error Code {error_code}]")
+
 
 class RCUCANbusAdapter:
-	""" 
+	"""
     RCU CANBUS Adapter
     This is the python class object for Xnergy RCU ROS Driver CANBUS adapter class.
     RCUCanbus Adapter python class object require to input serialport to initiate the class object
     RCUCanbusAdapter class object generally provide three function:
     a) Trigger RCU unit to charge through CANBUS
     b) Trigger RCU unit to discharge through CANBUS
-    c) Trigger RCU unit to update status and capture the information into RCUCANbusAdapter object variables 
+    c) Trigger RCU unit to update status and capture the information into RCUCANbusAdapter object variables
     """
+
 	def __init__(self, port='can0', bitrate=250000):
 		""" Initialize RCU CANbus rtu """
 		self.is_connected = True
@@ -44,131 +87,255 @@ class RCUCANbusAdapter:
 		self.charge_status = -1
 		self.charge_status_message = ''
 		self.errors = []
-		self.device_temperature = -1
-		self.coil_temperature = -1
+		self.device_temperature = absolut_zero_temperature
+		self.coil_temperature = absolut_zero_temperature
 		self.error_code = 0
 		self.shadow_error_code = 0
-		self.rcu_lock = Lock()
+		self.rcu_lock = RLock()
 		self._port = port
 		self._bitrate = bitrate
 
+		self.lost_packet_count = 0
+		self.lost_packet_tolerence = 2
+
 	def connect(self):
 		try:
-			self.bus = can.Bus(interface='socketcan', channel=self._port, bitrate=self._bitrate, receive_own_message=True)
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_CHARGING_STATUS), timeout=0.2)
-			test = self.bus.recv(timeout=1)
-			if test is None:
+			self.bus = can.ThreadSafeBus(interface='socketcan', channel=self._port, bitrate=self._bitrate, receive_own_message=True)
+			valid, data = self.canopen_sdo(_CANBUS_ADDRESS_READ_FIRMWARE_REVISION_HI)
+			if valid:
+				firmware_version_hi = struct.unpack('=HH', data)[0]
+				self.firmware_version_number = firmware_version_hi
+				rospy.loginfo(f'firmware_version_hi: {firmware_version_hi:04X}')
+				self.is_connected = True
+				return True
+			else:
 				self.is_connected = False
 				return False
-			return True
-		except:
+		except (can.exceptions.CanInterfaceNotImplementedError, can.exceptions.CanInitializationError, ValueError) as e:
+			rospy.logerr(f'RCU CANbus connection failed: {e}')
 			self.is_connected = False
 			return False
 
 	def enable_charge(self):
 		""" Enable RCU to charge """
-		return self.canbus_send(_CANBUS_ADDRESS_ENABLE_CHARGING)
+		valid, data = self.canopen_sdo(_CANBUS_ADDRESS_ENABLE_CHARGING)
+		return valid
 
 	def disable_charge(self):
 		""" disable RCU to charge """
-		return self.canbus_send(_CANBUS_ADDRESS_DISABLE_CHARGING)
+		valid, data = self.canopen_sdo(_CANBUS_ADDRESS_DISABLE_CHARGING)
+		return valid
 
-	def canbus_send(self, address):
-		""" Sending command to RCU unit with threading lock to prevent parallel access to interface """
-		self.rcu_lock.acquire()
-		result = False
-		try:
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=address), timeout=0.2)
-			result = True
-		except Exception as e:
-			rospy.logwarn("CAN communication error: %s.", str(e))
-			self.connect()
-		self.rcu_lock.release()
-		return result
+	def request_range_check(self) -> bool:
+		"""
+		send request to RCU for range checking
+		return:
+		True if request get ACK
+		False if no ACK
+		"""
+		valid, data = self.canopen_sdo(_CANBUS_ADDRESS_REQUEST_RANGE_CHECK)
+
+		return valid
+
+	def read_range_check_status(self) -> (bool, int):
+		"""
+		read the range check status of the RCU unit
+		return status after ACK
+		return None if no ACK
+		"""
+		valid, data = self.canopen_sdo(_CANBUS_ADDRESS_READ_RANGE_CHECK_STATUS)
+
+		check_status = struct.unpack('=HH', data)[0] if valid else None
+
+		return valid, check_status
 
 	def reset_errors(self):
 		self.errors = []
 
+	def parse_msg(self, msg, req):
+		""" Parse RCU CANbus message
+		return: (index_valid, data)
+		 """
+		try:
+			(command, index, sub_index, data) = struct.unpack('=BHB4s', msg)
+		except struct.error:
+			return False, None
+		index_expected = req[2] << 8 | req[1]
+		sub_index_expected = req[3]
+		# rospy.loginfo(f'{binascii.hexlify(msg)}')
+		# rospy.loginfo(f'index:{msg[1:3]} ->{index}, sub_index: {msg[3:4]} -> {sub_index}, index_expected: {index_expected}, sub_index_expected: {sub_index_expected}')
+
+		if index == index_expected and sub_index == sub_index_expected:
+			return (True, data)
+		else:
+			return (False, data)
+
+	def canopen_sdo(self, cmd):
+		""" Sending command to RCU unit with threading lock to prevent parallel access to interface
+			check the index and sub index of the message
+			return the index check result and the data part
+		"""
+		self.rcu_lock.acquire()
+		return_valid = False
+		return_result = bytearray()
+		try:
+			msg_tx = can.Message(timestamp=time.time(), arbitration_id=0x60a, is_extended_id=False, data=cmd)
+			self.bus.send(msg=msg_tx, timeout=0.2)
+
+			got = False
+			timer = time.time()
+			while not got:
+				if time.time() - timer > 0.5:
+					self.lost_packet_count += 1
+					raise CanDataError('RCU CANBUS RX timeout')
+
+				msg_rx = self.bus.recv(timeout=0.1)
+				if msg_rx is not None and not msg_rx.is_error_frame:
+					break
+				else:
+					continue
+
+			msg = msg_rx.data
+			valid, data = self.parse_msg(msg, cmd)
+			if not valid:
+				rospy.logdebug(f'CAN message \n{msg_tx=}, \n{msg_rx=}')
+				self.lost_packet_count += 1
+			else:
+				self.lost_packet_count = 0
+			return_valid = valid
+			return_result = data
+
+		except (can.exceptions.CanOperationError, CanDataError) as e:
+			rospy.logwarn(f'CAN communication error: {e}')
+			return_valid = False
+			return_result = None
+			self.lost_packet_count += 1
+		finally:
+			self.rcu_lock.release()
+			if self.lost_packet_count > self.lost_packet_tolerence:
+				self.charge_status = ChargerState.RCU_NOT_CONNECTED
+				self.charge_status_message = "comm error"
+				self.is_connected = False
+				rospy.logerr(f'lost {self.lost_packet_count} packets continusly, please check your connection and power up RCU unit')
+				self.bus.flush_tx_buffer()
+				self.bus.recv(timeout=0.1)
+				return False, None
+
+		return return_valid, return_result
+
+	def _get_rcu_status_single(self, cmd) -> (bool, int):
+		"""
+		get the status of the RCU unit
+		return status after ACK
+		return None if no ACK
+		"""
+		if not self.is_connected:
+			return (False, None)
+
+		valid, data = self.canopen_sdo(cmd)
+		if valid:
+			return (True, data)
+		else:
+			return (False, data)
+
 	def get_rcu_status(self):
-		""" 
+		"""
         Get charging and hardware information from RCU unit
         and store the information to RCUCANbusAdapter object variable
         """
-		self.rcu_lock.acquire()
-		try:
-			# Get charging status
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_CHARGING_STATUS), timeout=0.2)
-			reply_msg = self._receive_can_message()
-			if reply_msg == '4f00200101000000':
-				self.charge_status_message = 'charging'
-				self.charge_status = ChargerState.RCU_CHARGING
-			elif reply_msg == '4f00200100000000':
-				self.charge_status_message = 'idle'
-				self.charge_status = ChargerState.RCU_IDLE
 
-			# Get Battery Voltage
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_BATTERY_VOLTAGE), timeout=0.2)
-			msg = self._receive_can_message()
-			self.battery_voltage = int(f'{msg[10:12]}{msg[8:10]}', 16) / 128
-
-			# Get Charging Current
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_CHARGING_CURRENT), timeout=0.2)
-			msg = self._receive_can_message()
-			self.output_current = int(f'{msg[10:12]}{msg[8:10]}', 16) / 128
-
-			# Get runtime error code
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_RUNTIME_ERROR_HI), timeout=0.2)
-			msg = self._receive_can_message()
-			error_code_hi = int(f'{msg[10:12]}{msg[8:10]}', 16)
-
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_RUNTIME_ERROR_LO), timeout=0.2)
-			msg = self._receive_can_message()
-			error_code_lo = int(f'{msg[10:12]}{msg[8:10]}', 16)
-
-			self.error_code = error_code_hi << 16 | error_code_lo
-
-			# todo decode error code
-
-			# Get shadow error code
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_SHADOW_ERROR_HI), timeout=0.2)
-			msg = self._receive_can_message()
-			shadow_error_code_hi = int(f'{msg[10:12]}{msg[8:10]}', 16)
-
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_SHADOW_ERROR_LO), timeout=0.2)
-			msg = self._receive_can_message()
-			shadow_error_code_lo = int(f'{msg[10:12]}{msg[8:10]}', 16)
-
-			self.shadow_error_code = shadow_error_code_hi << 16 | shadow_error_code_lo
-
-			# todo decode shadow error code
-			# todo get RCU temperature
-
-			# get runtime voltage setting
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_RUNTIME_VOLTAGE_SETTING), timeout=0.2)
-			msg = self._receive_can_message()
-			self.runtime_voltage_setting = int(f'{msg[10:12]}{msg[8:10]}', 16) / 128
-
-			# get runtime current setting
-			self.bus.send(can.Message(arbitration_id=0x60a, is_extended_id=False, data=_CANBUS_ADDRESS_READ_RUNTIME_CURRENT_SETTING), timeout=0.2)
-			msg = self._receive_can_message()
-			self.runtime_current_setting = int(f'{msg[10:12]}{msg[8:10]}', 16) / 128
-
-		except can.CanError as e:
-			self.charge_status_message = "comm error"
-			self.charge_status = ChargerState.RCU_NOT_CONNECTED
-			rospy.logerr("Cannot communicate with the device: %s.", str(e))
-			self.connect()
-		except:
-			self.charge_status_message = "comm error"
-			self.charge_status = ChargerState.RCU_NOT_CONNECTED
-			rospy.logerr("Did not receive reply.")
-			self.connect()
-		self.rcu_lock.release()
-
-	def _receive_can_message(self):
-		reply_msg = None
-		reply_msg = self.bus.recv(timeout=1)
-		if reply_msg is None:
-			raise Exception("Did not receive reply.")
+		# Get charging status
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_MAIN_STATE)
+		if valid:
+			main_state = struct.unpack('=HH', data)[0]
+			self.charge_status = main_state
+			self.charge_status_message = translate_charge_status(main_state)
+			rospy.logdebug(f'charger state: {self.charge_status} {self.charge_status_message}')
 		else:
-			return reply_msg.data.hex()
+			rospy.logwarn('Failed to get main state')
+			return
+
+		# Get Battery Voltage
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_BATTERY_VOLTAGE)
+		if valid:
+			self.battery_voltage = struct.unpack('=HH', data)[0] / 128
+			rospy.logdebug(f'battery_voltage: {self.battery_voltage:6.2f}')
+		else:
+			rospy.logwarn('Failed to get Battery Voltage')
+			return
+
+		# Get Charging Current
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_CHARGING_CURRENT)
+		if valid:
+			self.output_current = struct.unpack('=HH', data)[0] / 128
+			rospy.logdebug(f'output_current: {self.output_current:6.2f}')
+		else:
+			rospy.logwarn('Failed to get Battery Voltage')
+			return
+
+		# Get runtime error code
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_RUNTIME_ERROR_HI)
+		if valid:
+			error_code_hi = struct.unpack('=HH', data)[0]
+			# rospy.logdebug(f'error_code_hi: {error_code_hi:04X}')
+		else:
+			error_code_hi = 0
+			rospy.logwarn('Failed to get error_code_hi')
+			return
+
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_RUNTIME_ERROR_LO)
+		if valid:
+			error_code_lo = struct.unpack('=HH', data)[0]
+			# rospy.logdebug(f'error_code_lo: {error_code_lo:04X}')
+		else:
+			error_code_lo = 0
+			rospy.logwarn('Failed to get error_code_lo')
+			return
+
+		self.error_code = error_code_hi << 16 | error_code_lo
+		rospy.logdebug(f'error_code: {self.error_code :08X}')
+
+		# todo decode error code
+
+		# Get shadow error code
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_SHADOW_ERROR_HI)
+		if valid:
+			shadow_error_code_hi = struct.unpack('=HH', data)[0]
+			# rospy.logdebug(f'shadow_error_code_hi: {shadow_error_code_hi:04X}')
+		else:
+			shadow_error_code_hi = 0
+			rospy.logwarn('Failed to get shadow_error_code_hi')
+			return
+
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_SHADOW_ERROR_LO)
+		if valid:
+			shadow_error_code_lo = struct.unpack('=HH', data)[0]
+			# rospy.logdebug(f'shadow_error_code_lo: {shadow_error_code_lo:04X}')
+		else:
+			shadow_error_code_lo = 0
+			rospy.logwarn('Failed to get shadow_error_code_lo')
+			return
+
+		self.shadow_error_code = shadow_error_code_hi << 16 | shadow_error_code_lo
+		rospy.logdebug(f'shadow_error_code: {self.shadow_error_code:08X}')
+
+		# todo decode shadow error code
+		# todo get RCU temperature
+
+		# get runtime voltage setting
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_RUNTIME_VOLTAGE_SETTING)
+		if valid:
+			self.runtime_voltage_setting = struct.unpack('=HH', data)[0] / 128
+			rospy.logdebug(f'runtime_voltage_setting: {self.runtime_voltage_setting:6.2f}')
+		else:
+			rospy.logwarn('Failed to get runtime_voltage_setting')
+			return
+
+		# get runtime current setting
+		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_RUNTIME_CURRENT_SETTING)
+		if valid:
+			self.runtime_current_setting = struct.unpack('=HH', data)[0] / 128
+			rospy.logdebug(f'runtime_current_setting: {self.runtime_current_setting:6.2f}')
+		else:
+			rospy.logwarn('Failed to get runtime_current_setting')
+			return

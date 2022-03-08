@@ -21,10 +21,17 @@ add_message_files(
   ChargerState.msg
 )
 
+add_service_files(
+  DIRECTORY srv
+  FILES
+  DummyComm.srv
+)
+
 add_action_files(
   DIRECTORY action
   FILES
   Charge.action
+  RangeCheck.action
 )
 
 generate_messages(

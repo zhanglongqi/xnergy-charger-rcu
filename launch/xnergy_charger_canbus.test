@@ -1,0 +1,50 @@
+<launch>
+
+  <include file="$(find xnergy_charger_rcu)/launch/xnergy_charger_canbus.launch">
+    <arg name="device" value="can0" />
+    <arg name="bitrate" default="250000" />
+    <arg name="comm_interface" value="canbus" />
+  </include>
+
+  <test test-name="hztest_rcu_status" pkg="rostest" type="hztest" name="hztest_rcu_status">
+    <param name="topic" value="/xnergy_charger_rcu/rcu_status" />
+    <param name="hz" value="1" />
+    <param name="hzerror" value="1" />
+    <param name="test_duration" value="5.0" />
+  </test>
+  <test test-name="pubtest_rcu_status" type="publishtest" pkg="rostest">
+    <rosparam>
+            topics : 
+            - name : /xnergy_charger_rcu/rcu_status
+              timeout: 10
+    </rosparam>
+  </test>
+  <test test-name="advertisetest_services" pkg="rostest" type="advertisetest" time-limit="20.0" retry="3">
+    <rosparam>
+      topics:
+        - name : /xnergy_charger_rcu/charge/status
+          timeout: 10
+        - name : /xnergy_charger_rcu/charge/result
+          timeout: 10
+        - name : /xnergy_charger_rcu/charge/feedback
+          timeout: 10
+        - name : /xnergy_charger_rcu/rangecheck/status
+          timeout: 10
+        - name : /xnergy_charger_rcu/rangecheck/result
+          timeout: 10
+        - name : /xnergy_charger_rcu/rangecheck/feedback
+          timeout: 10
+      services:
+        - name: /xnergy_charger_rcu/start_charging
+          type: std_srvs/Trigger
+          timeout: 10
+        - name: /xnergy_charger_rcu/stop_charging
+          type: std_srvs/Trigger
+          timeout: 10
+    </rosparam>
+  </test>
+  <test test-name="range_check_test" pkg="xnergy_charger_rcu" type="test_xnergy_charger_node.py" time-limit="120">
+    <param name="comm_interface" value="canbus" />
+  </test>
+
+</launch>

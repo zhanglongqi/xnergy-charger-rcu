@@ -1,0 +1,34 @@
+## Goal Definition
+bool start_rangecheck
+---
+## Result Definition
+#0 means the range checking is ongoing.
+#1 means the range checking is successfully finished and charger is within effective air gap wireless charging tolerance range
+#2 means the range checking is successfully finished but charger is out of effective air gap wireless charging tolerance range
+#240 means the range checking failed and the possible error could be communication loss or pairing timeout. The detail RCU status is in the topic /rcu_status
+#It will send 250 as result status instead of sending feedback message if status 250 is encountered .
+#250 means the RCU is not able to perform range checking.
+#251: timeout
+uint16 ONGOING = 0
+uint16 IN_RANGE = 1
+uint16 OUT_RANGE = 2
+uint16 FAILED = 240
+
+uint16 RANGE_CHECKING_NOT_APPLICABLE = 250
+uint16 TIMEOUT = 251
+
+uint16 status
+string message
+---
+## Feedback Definition
+
+uint16 ONGOING = 0
+uint16 IN_RANGE = 1
+uint16 OUT_RANGE = 2
+uint16 FAILED = 240
+
+uint16 RANGE_CHECKING_NOT_APPLICABLE = 250
+uint16 TIMEOUT = 251
+
+uint16 status
+string message

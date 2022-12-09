@@ -11,6 +11,8 @@ gpiod = "*"
 [dev-packages]
 yapf = "*"
 flake8 = "*"
+pyinstaller = "*"
+ipython = "*"
 
 [requires]
 python_version = "3.8"

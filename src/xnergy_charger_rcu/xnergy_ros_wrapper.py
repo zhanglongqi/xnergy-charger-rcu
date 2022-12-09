@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
-import rospy
 import diagnostic_msgs
 import diagnostic_updater
-# from sensor_msgs.msg import BatteryState
-from xnergy_charger_rcu.msg import ChargerState
+import rospy
 from std_srvs.srv import Trigger, TriggerResponse
+
+# from sensor_msgs.msg import BatteryState
+from xnergy_charger_rcu.msg import ChargerState, RangeCheckFeedback
 from xnergy_charger_rcu.utils import translate_charge_status
-from xnergy_charger_rcu.msg import RangeCheckFeedback
 
 
 class XnergyChargerROSWrapper:
@@ -47,6 +47,7 @@ class XnergyChargerROSWrapper:
         """
 		if interface == "modbus":
 			from xnergy_charger_rcu.rcu_modbus_adapter import RCUModbusAdapter
+
 			# baudrate = rospy.get_param("~baudrate", 9600)
 			baudrate = 9600
 			port = rospy.get_param("~device", "/dev/ttyUSB0")
@@ -56,9 +57,9 @@ class XnergyChargerROSWrapper:
 		elif interface == "canbus":
 			from xnergy_charger_rcu.rcu_canbus_adapter import RCUCANbusAdapter
 			port = rospy.get_param("~device", "can0")
-			bitrate = rospy.get_param("~bitrate", 250000)
-			rospy.loginfo(f'CAN bus device: {port=} {bitrate=}')
-			self.rcu = RCUCANbusAdapter(port=port, bitrate=bitrate)
+			node_id = rospy.get_param("~node_id", 10)
+			rospy.loginfo(f'CAN bus device: {port=}, CANOpen {node_id=}')
+			self.rcu = RCUCANbusAdapter(port=port, node_id=node_id)
 
 		elif interface == "gpio":
 			from xnergy_charger_rcu.rcu_gpio_adapter import RCUGPIOAdapter

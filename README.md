@@ -103,7 +103,7 @@ roslaunch xnergy_charger_rcu xnergy_charger_gpio.launch
 
 * **CANbus**:
   * `device` : default value = 'can0' (depend on the CAN port used)
-  * `bitrate` : default value = 250000 (depend on the CANBUS setting in the RCU)
+  * `node_id`: default value = 10 (depend on the setting in RCU)
   * `communication_interface` : value = 'canbus'
 
 * **GPIO**:
@@ -242,13 +242,14 @@ tail -f /var/log/syslog
 
 ### CANbus
 
+
 To list can interfaces with debugging information
 
 ```shell
 ip link show
 ```
 
-Configuring and Enabling the SocketCAN Interface: To enable CAN interface with RCU unit, run:
+Configuring and Enabling the SocketCAN Interface: To enable CAN interface on your laptop, run:
 
 ```shell
 sudo ip link set down can0
@@ -256,6 +257,9 @@ sudo ip link set down can0
 sudo ip link set can0 type can bitrate 250000
 sudo ip link set up can0
 ```
+
+The CAN bus reading is enabled all the time. The CAN bus option needs to be enabled by modbus if you 
+want to control the RCU including enable/disable charging and change parameters by CAN bus.
 
 ### GPIO
 
@@ -287,6 +291,15 @@ Run docker image for Modbus:
 ```shell
 docker run -it --rm -e ROS_MASTER_URI="http://localhost:11311" -e ROS_IP="127.0.0.1" --device=/dev/ttyRCU xnergy_charger_rcu:latest roslaunch xnergy_charger_rcu xnergy_charger_modbus.launch device:=/dev/ttyRCU
 ```
+
+Run docker image for CAN bus:
+
+```shell
+docker run -it --rm -e ROS_MASTER_URI="http://localhost:11311" -e ROS_IP="127.0.0.1" --network=host xnergy_charger_rcu:latest roslaunch xnergy_charger_rcu xnergy_charger_canbus.launch device:=can0 node_id:=10
+```
+
+The host networking mode is used for testing only, it's not recommanded for the production environment.
+You can use `vscan` and `can gateway` as described [here](https://www.systec-electronic.com/en/demo/blog/article/news-socketcan-docker-the-solution) and [here](https://www.lagerdata.com/articles/forwarding-can-bus-traffic-to-a-docker-container-using-vxcan-on-raspberry-pi)
 
 ## Maintainer
 

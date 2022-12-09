@@ -2,7 +2,7 @@
 
   <include file="$(find xnergy_charger_rcu)/launch/xnergy_charger_canbus.launch">
     <arg name="device" value="can0" />
-    <arg name="bitrate" default="250000" />
+    <arg name="node_id" value="10" />
     <arg name="comm_interface" value="canbus" />
   </include>
 

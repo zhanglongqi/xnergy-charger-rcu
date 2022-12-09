@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-
-import can
-from typing import Optional
 import struct
 import time
-import rospy
 from threading import RLock
+from typing import Optional, Tuple
+
+import can
+import rospy
+from can.exceptions import CanOperationError
+
 from xnergy_charger_rcu.msg import ChargerState
-from xnergy_charger_rcu.utils import translate_charge_status, absolut_zero_temperature
+from xnergy_charger_rcu.utils import (absolut_zero_temperature,
+                                      translate_charge_status)
 
 # CAN BUS Command
 _CANBUS_ADDRESS_ENABLE_CHARGING = [0x2F, 0x00, 0x20, 0x01, 0x01, 0x00, 0x00, 0x00]
@@ -76,7 +79,7 @@ class RCUCANbusAdapter:
     c) Trigger RCU unit to update status and capture the information into RCUCANbusAdapter object variables
     """
 
-	def __init__(self, port='can0', bitrate=250000):
+	def __init__(self, port='can0', node_id=0xA):
 		""" Initialize RCU CANbus rtu """
 		self.is_connected = True
 		self.firmware_version_number = -1
@@ -93,14 +96,14 @@ class RCUCANbusAdapter:
 		self.shadow_error_code = 0
 		self.rcu_lock = RLock()
 		self._port = port
-		self._bitrate = bitrate
-
+		self._NODE_ID = node_id
+		self._CAN_FILTERS = [{"can_id": 0x580 + node_id, "can_mask": 0x1FFFFFFF, "extended": False}]
 		self.lost_packet_count = 0
 		self.lost_packet_tolerence = 2
 
 	def connect(self):
 		try:
-			self.bus = can.ThreadSafeBus(interface='socketcan', channel=self._port, bitrate=self._bitrate, receive_own_message=True)
+			self.bus = can.ThreadSafeBus(interface='socketcan', channel=self._port, receive_own_message=True, can_filters=self._CAN_FILTERS)
 			valid, data = self.canopen_sdo(_CANBUS_ADDRESS_READ_FIRMWARE_REVISION_HI)
 			if valid:
 				firmware_version_hi = struct.unpack('=HH', data)[0]
@@ -137,7 +140,7 @@ class RCUCANbusAdapter:
 
 		return valid
 
-	def read_range_check_status(self) -> (bool, int):
+	def read_range_check_status(self) -> Tuple[bool, int]:
 		"""
 		read the range check status of the RCU unit
 		return status after ACK
@@ -179,7 +182,7 @@ class RCUCANbusAdapter:
 		return_valid = False
 		return_result = bytearray()
 		try:
-			msg_tx = can.Message(timestamp=time.time(), arbitration_id=0x60a, is_extended_id=False, data=cmd)
+			msg_tx = can.Message(timestamp=time.time(), arbitration_id=0x600 + self._NODE_ID, is_extended_id=False, data=cmd)
 			self.bus.send(msg=msg_tx, timeout=0.2)
 
 			got = False
@@ -205,7 +208,7 @@ class RCUCANbusAdapter:
 			return_valid = valid
 			return_result = data
 
-		except (can.exceptions.CanOperationError, CanDataError) as e:
+		except (CanOperationError, CanDataError) as e:
 			rospy.logwarn(f'CAN communication error: {e}')
 			return_valid = False
 			return_result = None
@@ -223,7 +226,7 @@ class RCUCANbusAdapter:
 
 		return return_valid, return_result
 
-	def _get_rcu_status_single(self, cmd) -> (bool, int):
+	def _get_rcu_status_single(self, cmd) -> Tuple[bool, int]:
 		"""
 		get the status of the RCU unit
 		return status after ACK

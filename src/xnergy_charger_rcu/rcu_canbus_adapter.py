@@ -105,7 +105,7 @@ class RCUCANbusAdapter:
 		try:
 			self.bus = can.ThreadSafeBus(interface='socketcan', channel=self._port, receive_own_message=True, can_filters=self._CAN_FILTERS)
 			valid, data = self.canopen_sdo(_CANBUS_ADDRESS_READ_FIRMWARE_REVISION_HI)
-			if valid:
+			if valid and data:
 				firmware_version_hi = struct.unpack('=HH', data)[0]
 				self.firmware_version_number = firmware_version_hi
 				rospy.loginfo(f'firmware_version_hi: {firmware_version_hi:04X}')
@@ -226,7 +226,7 @@ class RCUCANbusAdapter:
 
 		return return_valid, return_result
 
-	def _get_rcu_status_single(self, cmd) -> Tuple[bool, int]:
+	def _get_rcu_status_single(self, cmd) -> Tuple[bool, bytearray | None]:
 		"""
 		get the status of the RCU unit
 		return status after ACK
@@ -236,7 +236,7 @@ class RCUCANbusAdapter:
 			return (False, None)
 
 		valid, data = self.canopen_sdo(cmd)
-		if valid:
+		if valid and data:
 			return (True, data)
 		else:
 			return (False, data)
@@ -249,7 +249,7 @@ class RCUCANbusAdapter:
 
 		# Get charging status
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_MAIN_STATE)
-		if valid:
+		if valid and data:
 			main_state = struct.unpack('=HH', data)[0]
 			self.charge_status = main_state
 			self.charge_status_message = translate_charge_status(main_state)
@@ -260,7 +260,7 @@ class RCUCANbusAdapter:
 
 		# Get Battery Voltage
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_BATTERY_VOLTAGE)
-		if valid:
+		if valid and data:
 			self.battery_voltage = struct.unpack('=HH', data)[0] / 128
 			rospy.logdebug(f'battery_voltage: {self.battery_voltage:6.2f}')
 		else:
@@ -269,7 +269,7 @@ class RCUCANbusAdapter:
 
 		# Get Charging Current
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_CHARGING_CURRENT)
-		if valid:
+		if valid and data:
 			self.output_current = struct.unpack('=HH', data)[0] / 128
 			rospy.logdebug(f'output_current: {self.output_current:6.2f}')
 		else:
@@ -278,7 +278,7 @@ class RCUCANbusAdapter:
 
 		# Get runtime error code
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_RUNTIME_ERROR_HI)
-		if valid:
+		if valid and data:
 			error_code_hi = struct.unpack('=HH', data)[0]
 			# rospy.logdebug(f'error_code_hi: {error_code_hi:04X}')
 		else:
@@ -287,7 +287,7 @@ class RCUCANbusAdapter:
 			return
 
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_RUNTIME_ERROR_LO)
-		if valid:
+		if valid and data:
 			error_code_lo = struct.unpack('=HH', data)[0]
 			# rospy.logdebug(f'error_code_lo: {error_code_lo:04X}')
 		else:
@@ -302,7 +302,7 @@ class RCUCANbusAdapter:
 
 		# Get shadow error code
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_SHADOW_ERROR_HI)
-		if valid:
+		if valid and data:
 			shadow_error_code_hi = struct.unpack('=HH', data)[0]
 			# rospy.logdebug(f'shadow_error_code_hi: {shadow_error_code_hi:04X}')
 		else:
@@ -311,7 +311,7 @@ class RCUCANbusAdapter:
 			return
 
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_SHADOW_ERROR_LO)
-		if valid:
+		if valid and data:
 			shadow_error_code_lo = struct.unpack('=HH', data)[0]
 			# rospy.logdebug(f'shadow_error_code_lo: {shadow_error_code_lo:04X}')
 		else:
@@ -327,7 +327,7 @@ class RCUCANbusAdapter:
 
 		# get runtime voltage setting
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_RUNTIME_VOLTAGE_SETTING)
-		if valid:
+		if valid and data:
 			self.runtime_voltage_setting = struct.unpack('=HH', data)[0] / 128
 			rospy.logdebug(f'runtime_voltage_setting: {self.runtime_voltage_setting:6.2f}')
 		else:
@@ -336,7 +336,7 @@ class RCUCANbusAdapter:
 
 		# get runtime current setting
 		valid, data = self._get_rcu_status_single(_CANBUS_ADDRESS_READ_RUNTIME_CURRENT_SETTING)
-		if valid:
+		if valid and data:
 			self.runtime_current_setting = struct.unpack('=HH', data)[0] / 128
 			rospy.logdebug(f'runtime_current_setting: {self.runtime_current_setting:6.2f}')
 		else:

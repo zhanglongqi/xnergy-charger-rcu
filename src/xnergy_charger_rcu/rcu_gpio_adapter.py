@@ -19,6 +19,8 @@ class RCUGPIOAdapter:
 	def __init__(self, charger_control, charger_status):
 		""" Initialize RCU GPIO """
 		self.is_connected = True
+		self.error_code = 0
+		self.shadow_error_code = 0
 		self.firmware_version_number = -1
 		self.runtime_voltage_setting = -1
 		self.runtime_current_setting = -1

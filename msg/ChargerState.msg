@@ -36,3 +36,5 @@ float32 output_current
 uint32 error_code
 uint32 shadow_error_code
 string message
+
+string firmware_version

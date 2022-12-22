@@ -100,26 +100,6 @@ class XnergyChargerROSWrapper:
 				exit()
 
 		rospy.loginfo("XNERGY:: " + interface + ":: Connected to the RCU")
-		self.rcu.get_rcu_status()
-
-		if (self.rcu.firmware_version_number > 0):
-			firmware_version_number = f'{self.rcu.firmware_version_number:04X}'
-		else:
-			firmware_version_number = "Unknown"
-
-		if (self.rcu.runtime_voltage_setting >= 0):
-			runtime_voltage_setting = str(self.rcu.runtime_voltage_setting) + " V"
-		else:
-			runtime_voltage_setting = "Unknown"
-
-		if (self.rcu.runtime_current_setting >= 0):
-			runtime_current_setting = str(self.rcu.runtime_current_setting) + " A"
-		else:
-			runtime_current_setting = "Unknown"
-
-		rospy.loginfo("RCU Firmware Version: " + firmware_version_number)
-		rospy.loginfo("RCU Runtime Voltage Setting: " + runtime_voltage_setting)
-		rospy.loginfo("RCU Runtime Current Setting: " + runtime_current_setting)
 
 	@property
 	def is_connected(self):
@@ -152,6 +132,7 @@ class XnergyChargerROSWrapper:
 		msg.error_code = self.rcu.error_code
 		msg.shadow_error_code = self.rcu.shadow_error_code
 		msg.message = str(self.rcu.charge_status_message)
+		msg.firmware_version = f'{self.rcu.firmware_version_number:08X}'
 		self.rcu_status = msg
 		self.rcu_status_pub.publish(msg)
 

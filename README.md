@@ -84,7 +84,7 @@ roslaunch xnergy_charger_rcu xnergy_charger_canbus.launch
 or with argument
 
 ```shell
-roslaunch xnergy_charger_rcu xnergy_charger_canbus.launch device:="canNUM" bitrate:="250000"
+roslaunch xnergy_charger_rcu xnergy_charger_canbus.launch device:="canNUM" node_id:=10
 ```
 
 **GPIO**:

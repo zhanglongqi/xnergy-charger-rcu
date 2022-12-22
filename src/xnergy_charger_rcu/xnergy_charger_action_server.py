@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-import rospy
 import actionlib
-from xnergy_charger_rcu.msg import ChargerState, ChargeAction, ChargeFeedback, ChargeResult
+import rospy
+
+from xnergy_charger_rcu.msg import (ChargeAction, ChargeFeedback, ChargeResult, ChargerState)
 from xnergy_charger_rcu.utils import translate_charge_status
 
 
@@ -77,7 +78,7 @@ class ChargeActionServer:
 						goal_failed = False
 						rospy.loginfo("RCU is in charging")
 						break
-					else:
+					elif rcu_state_name in ('error', 'comm_error', 'atopping'):
 						rospy.logerr(f'RCU is in error state {rcu_state} error code {error_code:08X} shadow error code {shadow_error_code:08X}')
 						goal_failed = True
 						fail_msg = f'start charging failed, charger state: {rcu_state} error code {error_code:08X} shadow error code {shadow_error_code:08X}'

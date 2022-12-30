@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
-import rospy
 import signal
 import sys
 
-from xnergy_charger_rcu.xnergy_ros_wrapper import XnergyChargerROSWrapper
-from xnergy_charger_rcu.xnergy_charger_action_server import ChargeActionServer
+import rospy
+
 from xnergy_charger_rcu.range_check_action_server import RangeCheckActionServer
+from xnergy_charger_rcu.xnergy_charger_action_server import ChargeActionServer
+from xnergy_charger_rcu.xnergy_ros_wrapper import XnergyChargerROSWrapper
 
 
 def signal_handler(sig, frame):

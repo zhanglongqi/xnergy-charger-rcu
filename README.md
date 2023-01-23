@@ -1,4 +1,6 @@
-
+# 🔴
+# 🔴 This repo is archived and please use [this](https://gitlab.com/zhanglongqi/xnergy-charger-rcu) instead.
+# 🔴
 
 - [Xnergy RCU ROS driver](#xnergy-rcu-ros-driver)
   - [System Requirements](#system-requirements)
